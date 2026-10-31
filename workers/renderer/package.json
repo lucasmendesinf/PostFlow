@@ -1,0 +1,15 @@
+{
+  "name": "postflow-renderer",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Renderizador HTML -> JPEG do PostFlow (Playwright)",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}

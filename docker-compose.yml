@@ -1,0 +1,103 @@
+# PostFlow: painel/API, um worker por fila, agendador, renderizador (Node) e pré-processador (Python).
+# Subir:   docker compose up -d --build
+# Migrar:  docker compose exec app php artisan migrate
+# Testar:  docker compose exec app php artisan postflow:pipeline-test
+
+x-laravel: &laravel
+  build:
+    context: .
+    dockerfile: docker/app/Dockerfile
+  image: postflow-app
+  env_file: .env
+  environment: &laravel-env
+    DB_CONNECTION: pgsql
+    DB_HOST: postgres
+    DB_PORT: 5432
+    DB_DATABASE: ${DB_DATABASE:-postflow}
+    DB_USERNAME: ${DB_USERNAME:-postflow}
+    DB_PASSWORD: ${DB_PASSWORD:-postflow}
+    REDIS_CLIENT: predis
+    REDIS_HOST: redis
+    QUEUE_CONNECTION: redis
+    CACHE_STORE: redis
+    POSTFLOW_RENDERER_URL: http://renderer:3001
+    POSTFLOW_PREPROCESSOR_URL: http://preprocessor:3002
+  depends_on:
+    postgres:
+      condition: service_healthy
+    redis:
+      condition: service_healthy
+  restart: unless-stopped
+
+services:
+  postgres:
+    image: postgres:16-alpine
+    environment:
+      POSTGRES_DB: ${DB_DATABASE:-postflow}
+      POSTGRES_USER: ${DB_USERNAME:-postflow}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-postflow}
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 5s
+      retries: 10
+    restart: unless-stopped
+
+  redis:
+    image: redis:7-alpine
+    command: ["redis-server", "--appendonly", "yes"]
+    volumes:
+      - redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      retries: 10
+    restart: unless-stopped
+
+  app:
+    <<: *laravel
+    ports:
+      - "8000:8000"
+
+  queue-content:
+    <<: *laravel
+    command: ["php", "artisan", "queue:work", "redis", "--queue=content", "--tries=3", "--backoff=5,30,120"]
+
+  queue-render:
+    <<: *laravel
+    command: ["php", "artisan", "queue:work", "redis", "--queue=render", "--tries=3", "--backoff=5,30,120"]
+    depends_on:
+      redis:
+        condition: service_healthy
+      postgres:
+        condition: service_healthy
+      renderer:
+        condition: service_started
+      preprocessor:
+        condition: service_started
+
+  # Único worker que fala com a Meta.
+  queue-publish:
+    <<: *laravel
+    command: ["php", "artisan", "queue:work", "redis", "--queue=publish", "--tries=3", "--backoff=5,30,120"]
+
+  scheduler:
+    <<: *laravel
+    command: ["php", "artisan", "schedule:work"]
+
+  renderer:
+    build: ./workers/renderer
+    environment:
+      PORT: 3001
+    restart: unless-stopped
+
+  preprocessor:
+    build: ./workers/preprocessor
+    environment:
+      PORT: 3002
+    restart: unless-stopped
+
+volumes:
+  pgdata:
+  redisdata:
