@@ -222,6 +222,22 @@ class CicloTest extends TestCase
         Http::assertSent(fn (Request $q) => str_ends_with($q->url(), '/1784/media') && ($q['media_type'] ?? null) === 'CAROUSEL' && $q['children'] === 'F1,F2');
     }
 
+    public function test_orcamento_do_mes_atingido_pausa_a_geracao(): void
+    {
+        $c = $this->conta();
+        $p = Post::factory()->create(['tenant_id' => $c->tenant_id, 'account_id' => $c->id, 'agendado_para' => CarbonImmutable::now()->addDay()]);
+        \Illuminate\Support\Facades\DB::table('configuracoes')->insert(['chave' => 'orcamento_claude', 'valor' => json_encode(['usd_mes' => 0.01, 'pausar' => true])]);
+        UsageLog::create(['tenant_id' => $c->tenant_id, 'modelo' => 'claude-haiku-5-5', 'tokens_entrada' => 1, 'tokens_saida' => 1, 'custo_usd' => 0.02]);
+
+        $this->assertSame(0, $this->ciclo()->gerar(CarbonImmutable::now()));
+        $this->assertSame([], $this->gerador->chamadas);
+        $this->assertSame(PostStatus::Agendado, $p->refresh()->status);
+
+        // Com "pausar" desligado, so avisa: continua gerando
+        \Illuminate\Support\Facades\DB::table('configuracoes')->where('chave', 'orcamento_claude')->update(['valor' => json_encode(['usd_mes' => 0.01, 'pausar' => false])]);
+        $this->assertSame(1, $this->ciclo()->gerar(CarbonImmutable::now()));
+    }
+
     public function test_validacao_da_resposta_do_claude(): void
     {
         $ok = ClaudeGerador::validar(['tema' => 'Site', 'legenda' => 'Texto', 'hashtags' => ['sites', '#Sites', 'calutec'], 'alt_text' => '', 'slides' => [['html' => '<div></div>', 'css' => '']]], PostFormat::Feed);

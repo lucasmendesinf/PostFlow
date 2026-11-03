@@ -113,9 +113,18 @@ class Ciclo
     // ------------------------------------------------------------ 2. gerar
     public function gerar(CarbonImmutable $agora): int
     {
+        $semOrcamento = $this->orcamentoEsgotado($agora);
+
         // Nao deu tempo de gerar: o horario ja passou
         Post::query()->where('status', PostStatus::Agendado)->where('agendado_para', '<=', $agora)->get()
-            ->each(fn (Post $p) => $p->transitionTo(PostStatus::Expirado, 'o horário passou antes de o post ficar pronto'));
+            ->each(fn (Post $p) => $p->transitionTo(PostStatus::Expirado, $semOrcamento
+                ? 'orçamento do mês do Claude atingido: o post não foi gerado'
+                : 'o horário passou antes de o post ficar pronto'));
+
+        // Orcamento do mes atingido (e "pausar" ligado no painel): nao chama o Claude ate o mes virar ou o limite subir
+        if ($semOrcamento) {
+            return 0;
+        }
 
         $posts = Post::query()->where('status', PostStatus::Agendado)
             ->where(fn ($q) => $q->whereNull('proxima_tentativa_em')->orWhere('proxima_tentativa_em', '<=', $agora))
@@ -189,6 +198,23 @@ class Ciclo
 
             return $v;
         });
+    }
+
+    /**
+     * Orcamento mensal do Claude, definido no painel (tabela configuracoes, chave "orcamento_claude"):
+     * { usd_mes: 5, pausar: true }. Sem orcamento ou com "pausar" desligado, nunca bloqueia.
+     */
+    public function orcamentoEsgotado(CarbonImmutable $agora): bool
+    {
+        $cfg = DB::table('configuracoes')->where('chave', 'orcamento_claude')->value('valor');
+        $cfg = $cfg ? json_decode($cfg, true) : null;
+        if (! $cfg || empty($cfg['pausar']) || ! isset($cfg['usd_mes']) || (float) $cfg['usd_mes'] <= 0) {
+            return false;
+        }
+        $gasto = (float) UsageLog::query()->withoutGlobalScopes()
+            ->where('criado_em', '>=', $agora->startOfMonth())->sum('custo_usd');
+
+        return $gasto >= (float) $cfg['usd_mes'];
     }
 
     // ------------------------------------------------------------ 3. expirar
