@@ -92,6 +92,38 @@ cd workers/renderer && node --test                 # renderizador
 cd workers/preprocessor && python -m unittest      # pré-processador
 ```
 
+## Etapas 3 a 7 – Gerar e publicar sozinho ✅ (código) · ⏳ (aceite com a conta real)
+
+O painel é o **Calutec Admin** (menu PostFlow): lá você cadastra marcas, agendas, ideias, estilos e catálogo, aprova os
+posts e acompanha tudo. O PostFlow faz o trabalho: um comando por minuto (`php artisan postflow:ciclo`, pelo agendador).
+
+| Etapa | O que faz | Onde |
+| --- | --- | --- |
+| Planejar | Ideia pendente vira post na hora (um por formato; no mesmo horário, substitui o automático). Agenda cria o post do próximo horário com `POSTFLOW_ANTECEDENCIA_HORAS` de antecedência | `app/Services/Pipeline/Ciclo.php` |
+| Gerar | Claude escreve tema, legenda, hashtags e a arte em HTML/CSS (saída JSON validada). Texto fora do quadro volta ao Claude uma vez para corrigir. Custo vai para `usage_log` | `app/Services/Conteudo/ClaudeGerador.php`, `Prompt.php` |
+| Renderizar | HTML → JPEG (1080×1350 ou 1080×1920) num Chromium sem JavaScript e sem rede; fontes locais (Saira, Montserrat, Anton, Bebas Neue, Oswald, Inter); imagens só por `{{asset:chave}}` (logo da marca e fotos do catálogo) | `workers/renderer/render.js` |
+| Aprovar | Post vai para `aguardando_aprovacao` (ou direto para `aprovado` se a agenda publica sem revisão; ideias sempre pedem aprovação). Pelo admin: aprovar, mudar horário, publicar agora, editar legenda, gerar outra versão com comentário, rejeitar | admin (`/postflow/posts`) |
+| Expirar | Sem aprovação até `POSTFLOW_EXPIRA_MINUTOS` antes do horário, não publica | `Ciclo::expirar()` |
+| Publicar | Confere o limite de 24 h, cria o container (feed, carrossel com os filhos, ou stories), espera ficar pronto, `media_publish`, grava o link do post | `app/Services/Instagram/InstagramPublisher.php` |
+
+- **Modelo do Claude:** `POSTFLOW_CLAUDE_MODELO=claude-haiku-5-5` (o mais barato; centavos por mês com um post por dia).
+  Para arte mais caprichada, `claude-sonnet-5-5`. Chave em `ANTHROPIC_API_KEY`.
+- **Falhas:** cada etapa tenta de novo depois de 1, 5 e 15 minutos; na quarta falha o post vai para `erro`.
+  Token inválido marca a conta como `reconectar`; limite de publicações reagenda para 1 h depois.
+- **Na hora, sem esperar o ciclo:** `php artisan postflow:gerar <post> [--comentario="mais destaque no preço"]`.
+
+### Instalar na hospedagem com cPanel (sem Docker, sem Redis)
+
+1. PHP 8.2+ com `pdo_pgsql` (MultiPHP / Selecionar versão do PHP). Suba o projeto, `composer install --no-dev`,
+   `.env` a partir do `.env.example` (`QUEUE_CONNECTION=database`, `CACHE_STORE=database`), `php artisan key:generate`,
+   `php artisan postflow:token-key`, `php artisan migrate`, `php artisan storage:link`. A raiz do subdomínio é a pasta `public/`.
+2. Renderizador: em `workers/renderer`, `npm install` e `npx playwright install chromium`. No `.env`, deixe
+   `POSTFLOW_RENDERER_URL` vazio e aponte `POSTFLOW_RENDERER_CMD` para o node do cPanel e o `cli.js`. Se o servidor
+   limitar processos, `RENDER_SINGLE_PROCESS=1` (só um slide por vez).
+3. Cron do cPanel, a cada minuto: `cd /home/CONTA/postflow && php artisan schedule:run >> /dev/null 2>&1`.
+4. `APP_URL` tem que ser o endereço público com HTTPS: o Instagram baixa as imagens de `APP_URL/storage/...`.
+5. Antes, rode `scripts-servidor/testar-revenda-postflow.sh` (no repositório do admin) para ver se a conta aguenta.
+
 ## Próximas etapas
 
-3. Publicação manual · 4. Renderização e assets · 5. Geração com o Claude · 6. Preview e aprovação · 7. Agendas, ideias e modos · 8. Catálogo próprio · 9. Produto
+8. Catálogo próprio (importação por CSV) · 9. Produto · Reels (vídeo com ffmpeg, a partir de um roteiro do Claude)

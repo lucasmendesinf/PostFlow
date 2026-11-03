@@ -18,6 +18,7 @@ class Post extends Model
     protected $fillable = [
         'tenant_id', 'account_id', 'schedule_id', 'idea_id', 'formato', 'status', 'versao_aprovada_id',
         'agendado_para', 'ig_container_id', 'ig_media_id', 'publicado_em', 'erro',
+        'tentativas', 'proxima_tentativa_em', 'comentario_pendente',
     ];
 
     protected $attributes = [
@@ -31,6 +32,8 @@ class Post extends Model
             'status' => PostStatus::class,
             'agendado_para' => 'datetime',
             'publicado_em' => 'datetime',
+            'proxima_tentativa_em' => 'datetime',
+            'tentativas' => 'integer',
         ];
     }
 

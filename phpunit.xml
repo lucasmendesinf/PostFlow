@@ -34,6 +34,10 @@
         <env name="POSTFLOW_TOKEN_KEY" value="base64:MDEyMzQ1Njc4OWFiY2RlZjAxMjM0NTY3ODlhYmNkZWY="/>
         <env name="POSTFLOW_RENDERER_URL" value=""/>
         <env name="POSTFLOW_PREPROCESSOR_URL" value=""/>
+        <env name="POSTFLOW_RENDERER_CMD" value=""/>
+        <env name="POSTFLOW_CLAUDE_URL" value=""/>
+        <env name="ANTHROPIC_API_KEY" value=""/>
+        <env name="INSTAGRAM_GRAPH_URL" value="https://graph.instagram.com"/>
         <env name="NIGHTWATCH_ENABLED" value="false"/>
     </php>
 </phpunit>

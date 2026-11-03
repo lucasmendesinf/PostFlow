@@ -1,6 +1,6 @@
 {
   "name": "postflow-renderer",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "description": "Renderizador HTML -> JPEG do PostFlow (Playwright)",
@@ -8,6 +8,15 @@
   "scripts": {
     "start": "node server.js",
     "test": "node --test"
+  },
+  "dependencies": {
+    "@fontsource/anton": "5.1.0",
+    "@fontsource/bebas-neue": "5.1.0",
+    "@fontsource/montserrat": "5.1.0",
+    "@fontsource/oswald": "5.1.0",
+    "@fontsource/saira": "5.1.0",
+    "@fontsource/inter": "5.1.0",
+    "playwright": "1.49.1"
   },
   "engines": {
     "node": ">=20"

@@ -34,6 +34,8 @@ return [
         'client_secret' => env('INSTAGRAM_APP_SECRET'),
         'redirect_uri' => env('INSTAGRAM_REDIRECT_URI'),
         'graph_version' => env('INSTAGRAM_GRAPH_VERSION', 'v23.0'),
+        // So muda em testes (servidor falso)
+        'graph_url' => env('INSTAGRAM_GRAPH_URL', 'https://graph.instagram.com'),
         'scopes' => ['instagram_business_basic', 'instagram_business_content_publish'],
         // Renova os tokens que vencem em menos de N dias.
         'refresh_window_days' => (int) env('INSTAGRAM_REFRESH_WINDOW_DAYS', 10),

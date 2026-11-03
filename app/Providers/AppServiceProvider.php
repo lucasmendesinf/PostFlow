@@ -2,7 +2,12 @@
 
 namespace App\Providers;
 
+use App\Contracts\GeraConteudo;
+use App\Contracts\Renderiza;
+use App\Services\Conteudo\ClaudeGerador;
 use App\Services\Instagram\InstagramClient;
+use App\Services\Instagram\InstagramPublisher;
+use App\Services\Render\Renderizador;
 use App\Support\Tenancy\TenantContext;
 use App\Support\TokenEncrypter;
 use Illuminate\Support\ServiceProvider;
@@ -23,6 +28,9 @@ class AppServiceProvider extends ServiceProvider
         ));
 
         $this->app->bind(InstagramClient::class, fn () => new InstagramClient(config('services.instagram')));
+        $this->app->bind(InstagramPublisher::class, fn () => new InstagramPublisher(config('services.instagram')));
+        $this->app->bind(GeraConteudo::class, fn () => new ClaudeGerador(config('postflow.claude')));
+        $this->app->bind(Renderiza::class, fn () => new Renderizador(config('postflow.services')));
     }
 
     /**
